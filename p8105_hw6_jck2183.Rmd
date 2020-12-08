@@ -208,22 +208,181 @@ anova(model_maineff, model_interaction) %>%
 At 5% significance level, we can conclude that the average birth weight for the model which only contains the main effect(length at birth and gestational age) is different from the model including interaction term(head circumference, length, sex, and all interactions between these variables). 
 
 
-
-
-```{r}
-
-```
 The variables I hypothesize that underlie baby’s birthweight include: babysex, bhead, blength, delwt, gaweeks, momage, mrace, pnumlbw, pnumsga, and smoken. And I will try to see individual predictor has significant correlation with the birth weight or not.
-```{r}
 
+```{r}
+uni_babysex = lm(bwt ~ babysex, data = birth_df) %>% 
+    broom::tidy()  
+    
+
+birth_df %>% 
+  ggplot(aes(x = babysex, y = bwt)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm')
 ```
 
 ```{r}
+uni_bhead = lm(bwt ~ bhead, data = birth_df) %>% 
+    broom::tidy()  
+
+    
+birth_df %>% 
+  ggplot(aes(x = bhead, y = bwt)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm')    
+```
+
+```{r}
+uni_delwt = lm(bwt ~ delwt, data = birth_df) %>% 
+    broom::tidy() 
+
+birth_df %>%
+    ggplot(aes(x = delwt, y = bwt)) + 
+    geom_point() + 
+    geom_smooth(method = 'lm') 
+    
+```
+
+```{r}
+uni_gaweeks = lm(bwt ~ gaweeks, data = birth_df) %>% 
+    broom::tidy() 
+ 
+birth_df %>% 
+    ggplot(aes(x = gaweeks, y = bwt)) +
+    geom_point() +
+    geom_smooth(method = 'lm')
+```
+
+```{r}
+uni_momage = lm(bwt ~ momage, data = birth_df) %>% 
+    broom::tidy() 
+ 
+birth_df %>% 
+    ggplot(aes(x = momage, y = bwt)) +
+    geom_point() +
+    geom_smooth(method = 'lm')
+```
+
+```{r}
+uni_mrace = lm(bwt ~ mrace, data = birth_df) %>% 
+    broom::tidy() 
+ 
+birth_df %>% 
+    ggplot(aes(x = mrace, y = bwt)) +
+    geom_point() +
+    geom_smooth(method = 'lm')
+```
+
+```{r}
+uni_pnumlbw = lm(bwt ~ pnumlbw, data = birth_df) %>% 
+    broom::tidy() 
+ 
+birth_df %>% 
+    ggplot(aes(x = pnumlbw, y = bwt)) +
+    geom_point() +
+    geom_smooth(method = 'lm')
+```
+pnumsga
+```{r}
+uni_pnumlbw = lm(bwt ~ pnumsga, data = birth_df) %>% 
+    broom::tidy() 
+ 
+birth_df %>% 
+    ggplot(aes(x = pnumsga, y = bwt)) +
+    geom_point() +
+    geom_smooth(method = 'lm')
+```
+smoken
+```{r}
+uni_smoken = lm(bwt ~ smoken, data = birth_df) %>% 
+    broom::tidy() 
+ 
+birth_df %>% 
+    ggplot(aes(x = smoken, y = bwt)) +
+    geom_point() +
+    geom_smooth(method = 'lm')
+```
+After examining each variable and the birth weight, I decided to keep bhead, blength, gaweeks, momage, smoken, and the interaction between gaweeks and bhead, blenghth, momage, and smoken respectively.
+
+```{r}
+model_propose = lm(bwt ~ bhead + blength + gaweeks + momage + smoken + momage * bhead + momage * blength + momage * gaweeks + momage * smoken , data = birth_df) 
+
+
+model_propose %>% 
+    broom::tidy() %>% 
+    filter(p.value < 0.05)
+
+# 2.35e-1 -> 2.35 e-1 -> 2.25 x e-1 where e-1 = 10^-1
+```
+After comparing the p-value, we only include the predictors with significant p-values. 
+
+```{r}
+result_model = lm(bwt ~ bhead + blength + momage + smoken + momage * smoken, data = birth_df) 
+
+result_model %>% 
+    broom::tidy() %>% 
+    select(term, estimate, p.value)
+```
+
+```{r}
+birth_df %>% 
+  add_residuals(result_model) %>% 
+  modelr::add_predictions(result_model) %>% 
+  ggplot(aes(x = pred, y = resid)) + 
+  geom_point()
+```
+
+```{r}
+cv_df = 
+  crossv_mc(birth_df, 100)
+```
+
+```{r}
+cv_df %>% 
+    pull(train) %>% 
+    .[[1]] %>% 
+    as_tibble
+```
+
+
+```{r}
+cv_df %>% 
+    pull(test) %>% 
+    .[[1]] %>% 
+    as_tibble
+```
+
+```{r}
+cv_df =
+  cv_df %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+```
+
+```{r}
+cv_df = 
+  cv_df %>% 
+  mutate(maineff_mod  = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+         interaction_mod  = map(train, ~lm(bwt ~ bhead * blength * babysex, data = .x)),
+         result_mod  = map(train, ~lm(bwt ~ bhead + blength + momage + smoken + momage * smoken, data = .x))) %>% 
+  mutate(rmse_maineff = map2_dbl(maineff_mod, test, ~rmse(model = .x, data = .y)),
+         rmse_interaction = map2_dbl(interaction_mod, test, ~rmse(model = .x, data = .y)),
+         rmse_result = map2_dbl(result_mod, test, ~rmse(model = .x, data = .y)))
 
 ```
 
 
 ```{r}
-
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + 
+  geom_violin()
 ```
 
