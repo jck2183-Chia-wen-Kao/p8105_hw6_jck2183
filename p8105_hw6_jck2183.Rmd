@@ -7,6 +7,7 @@ output: github_document
 library(tidyverse)
 library(viridis)
 library(modelr)
+library(measurements)
 library(p8105.datasets)
 
 
@@ -101,5 +102,128 @@ models_results_df %>%
   geom_point(color = "#A35E60") + 
   geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper)) + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+## Problem 2
+
+Import Data
+
+```{r}
+birth_df = 
+  read_csv("./data/birthweight.csv", col_names = TRUE) %>% 
+    janitor::clean_names() %>% 
+    mutate(
+        babysex = as.factor(babysex), 
+        babysex = recode(babysex,
+                         "1" = "male", 
+                         "2" = "female"), 
+                frace = as.factor(frace),
+                frace = recode(
+                    frace, 
+                    "1" = "White", 
+                    "2" = "Black", 
+                    "3" = "Asian", 
+                    "4" = "Puerto Rican", 
+                    "8" = "Other", 
+                    "9" = "Unknown"), 
+        malform = as.factor(malform),
+        malform = recode(
+            malform,
+            "0" = "absent", 
+            "1" = "present"),
+        mrace = as.factor(mrace),
+        mrace = recode(
+            frace, 
+            "1" = "White", 
+            "2" = "Black", 
+            "3" = "Asian", 
+            "4" = "Puerto Rican", 
+            "8" = "Other", 
+            "9" = "Unknown"),
+        delwt = round(conv_unit(delwt, "lbs", "g"), digits = 0),
+        ppwt = round(conv_unit(ppwt, "lbs", "g"), digits = 0),
+        wtgain = round(conv_unit(wtgain, "lbs", "g"), digits = 0),
+        mheight = round(conv_unit(mheight, "inch", "cm"), digits = 0)
+    )
+```
+Fit a model : One using length at birth and gestational age as predictors (main effects only).
+
+```{r}
+model_maineff = lm(bwt ~ blength + gaweeks, data = birth_df) 
+    
+
+model_maineff %>% 
+    broom::tidy() %>% 
+    select(term, estimate, p.value) %>% 
+    rename(
+        "Term" = term, 
+        "Estimate" = estimate, 
+        "P-Value" = p.value
+    ) 
+```
+
+```{r}
+birth_df %>% 
+    add_residuals(model_maineff) %>%
+    add_predictions(model_maineff) %>% 
+    ggplot(aes(x = pred, y = resid)) + 
+    geom_point()
+```
+
+
+Fit another model : One using head circumference, length, sex, and all interactions (including the three-way interaction) between these.
+
+```{r}
+model_interaction = 
+    lm(bwt ~ bhead * blength * babysex, data = birth_df) 
+
+
+    
+model_interaction %>%     
+    broom::tidy() %>% 
+    select(term, estimate, p.value) %>% 
+    rename(
+        "Term" = term, 
+        "Estimate" = estimate, 
+        "P-Value" = p.value
+    ) 
+```
+
+```{r}
+birth_df %>% 
+    add_residuals(model_interaction) %>%
+    add_predictions(model_interaction) %>% 
+    ggplot(aes(x = pred, y = resid)) + 
+    geom_point()
+```
+
+
+Compare the two model with Anova:
+H0: μ_maineffect = μ_interaction
+H1: The means are not all equal.
+```{r}
+anova(model_maineff, model_interaction) %>% 
+    broom::tidy()
+```
+At 5% significance level, we can conclude that the average birth weight for the model which only contains the main effect(length at birth and gestational age) is different from the model including interaction term(head circumference, length, sex, and all interactions between these variables). 
+
+
+
+
+```{r}
+
+```
+The variables I hypothesize that underlie baby’s birthweight include: babysex, bhead, blength, delwt, gaweeks, momage, mrace, pnumlbw, pnumsga, and smoken. And I will try to see individual predictor has significant correlation with the birth weight or not.
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+
 ```
 
