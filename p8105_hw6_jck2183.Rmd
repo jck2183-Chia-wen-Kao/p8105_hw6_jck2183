@@ -5,6 +5,7 @@ output: github_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(ggpubr)
 library(viridis)
 library(modelr)
 library(measurements)
@@ -159,7 +160,8 @@ model_maineff %>%
         "Term" = term, 
         "Estimate" = estimate, 
         "P-Value" = p.value
-    ) 
+    ) %>% 
+    knitr::kable(digits = 4)
 ```
 
 ```{r}
@@ -186,7 +188,8 @@ model_interaction %>%
         "Term" = term, 
         "Estimate" = estimate, 
         "P-Value" = p.value
-    ) 
+    ) %>% 
+    knitr::kable(digits = 4)
 ```
 
 ```{r}
@@ -203,7 +206,8 @@ H0: μ_maineffect = μ_interaction
 H1: The means are not all equal.
 ```{r}
 anova(model_maineff, model_interaction) %>% 
-    broom::tidy()
+    broom::tidy() %>% 
+    knitr::kable(digits = 4)
 ```
 At 5% significance level, we can conclude that the average birth weight for the model which only contains the main effect(length at birth and gestational age) is different from the model including interaction term(head circumference, length, sex, and all interactions between these variables). 
 
@@ -211,21 +215,24 @@ At 5% significance level, we can conclude that the average birth weight for the 
 The variables I hypothesize that underlie baby’s birthweight include: babysex, bhead, blength, delwt, gaweeks, momage, mrace, pnumlbw, pnumsga, and smoken. And I will try to see individual predictor has significant correlation with the birth weight or not.
 
 ```{r}
-uni_babysex = lm(bwt ~ babysex, data = birth_df) %>% 
+uni_babysex = 
+    lm(bwt ~ babysex, data = birth_df) %>% 
     broom::tidy()  
-    
 
+  
 birth_df %>% 
   ggplot(aes(x = babysex, y = bwt)) + 
   geom_point() + 
   geom_smooth(method = 'lm')
+
+
 ```
 
 ```{r}
 uni_bhead = lm(bwt ~ bhead, data = birth_df) %>% 
     broom::tidy()  
 
-    
+
 birth_df %>% 
   ggplot(aes(x = bhead, y = bwt)) + 
   geom_point() + 
@@ -246,6 +253,7 @@ birth_df %>%
 ```{r}
 uni_gaweeks = lm(bwt ~ gaweeks, data = birth_df) %>% 
     broom::tidy() 
+
  
 birth_df %>% 
     ggplot(aes(x = gaweeks, y = bwt)) +
@@ -256,7 +264,7 @@ birth_df %>%
 ```{r}
 uni_momage = lm(bwt ~ momage, data = birth_df) %>% 
     broom::tidy() 
- 
+
 birth_df %>% 
     ggplot(aes(x = momage, y = bwt)) +
     geom_point() +
@@ -266,6 +274,7 @@ birth_df %>%
 ```{r}
 uni_mrace = lm(bwt ~ mrace, data = birth_df) %>% 
     broom::tidy() 
+
  
 birth_df %>% 
     ggplot(aes(x = mrace, y = bwt)) +
@@ -276,15 +285,16 @@ birth_df %>%
 ```{r}
 uni_pnumlbw = lm(bwt ~ pnumlbw, data = birth_df) %>% 
     broom::tidy() 
- 
+
+
 birth_df %>% 
     ggplot(aes(x = pnumlbw, y = bwt)) +
     geom_point() +
     geom_smooth(method = 'lm')
 ```
-pnumsga
+
 ```{r}
-uni_pnumlbw = lm(bwt ~ pnumsga, data = birth_df) %>% 
+uni_pnumsga = lm(bwt ~ pnumsga, data = birth_df) %>% 
     broom::tidy() 
  
 birth_df %>% 
@@ -292,36 +302,65 @@ birth_df %>%
     geom_point() +
     geom_smooth(method = 'lm')
 ```
-smoken
+
 ```{r}
 uni_smoken = lm(bwt ~ smoken, data = birth_df) %>% 
     broom::tidy() 
+
  
 birth_df %>% 
     ggplot(aes(x = smoken, y = bwt)) +
     geom_point() +
     geom_smooth(method = 'lm')
 ```
-After examining each variable and the birth weight, I decided to keep bhead, blength, gaweeks, momage, smoken, and the interaction between gaweeks and bhead, blenghth, momage, and smoken respectively.
-
+Check the correlation between birth weight and all numeric variables. 
 ```{r}
-model_propose = lm(bwt ~ bhead + blength + gaweeks + momage + smoken + momage * bhead + momage * blength + momage * gaweeks + momage * smoken , data = birth_df) 
-
-
-model_propose %>% 
-    broom::tidy() %>% 
-    filter(p.value < 0.05)
-
-# 2.35e-1 -> 2.35 e-1 -> 2.25 x e-1 where e-1 = 10^-1
+correlation_fun =
+    function(x) {
+        if (!is.numeric(x)) {
+           stop("X input must be numeric")   
+        }
+        corr = cor.test(x, birth_df$bwt, method = c("pearson", "kendall", "spearman")) %>% 
+            broom::tidy() %>% 
+            pull(estimate)
+            
+        
+        return(corr)
+    }
 ```
-After comparing the p-value, we only include the predictors with significant p-values. 
+
 
 ```{r}
-result_model = lm(bwt ~ bhead + blength + momage + smoken + momage * smoken, data = birth_df) 
+bind_rows(
+    correlation_fun(birth_df$bhead),
+    correlation_fun(birth_df$blength),
+    correlation_fun(birth_df$delwt),
+    correlation_fun(birth_df$fincome),
+    correlation_fun(birth_df$gaweeks), 
+    correlation_fun(birth_df$mheight), 
+    correlation_fun(birth_df$momage), 
+    correlation_fun(birth_df$ppbmi), 
+    correlation_fun(birth_df$ppwt), 
+    correlation_fun(birth_df$smoken), 
+    correlation_fun(birth_df$wtgain)
+) %>% add_column( variable =
+    c("bhead", "blength", "delwt", "fincome",
+      "gaweeks", "mheight", "momage", "ppbmi", "ppwt", 
+      "smoken", "wtgain"), .before = "cor"
+) %>% 
+    knitr::kable(digit = 4)
+```
+
+
+After examining the correlation between birth weights and the distribution of observation with plots, we only include the predictors which seems to associate with birth weight. 
+
+```{r}
+result_model = lm(bwt ~ bhead + blength + mheight + delwt + gaweeks + wtgain + mrace , data = birth_df) 
 
 result_model %>% 
     broom::tidy() %>% 
-    select(term, estimate, p.value)
+    select(term, estimate, p.value) %>% 
+    knitr::kable(digits = 4)
 ```
 
 ```{r}
@@ -337,19 +376,19 @@ cv_df =
   crossv_mc(birth_df, 100)
 ```
 
-```{r}
+```{r, results= FALSE}
 cv_df %>% 
     pull(train) %>% 
     .[[1]] %>% 
-    as_tibble
+    as_tibble 
 ```
 
 
-```{r}
+```{r, results= FALSE}
 cv_df %>% 
     pull(test) %>% 
     .[[1]] %>% 
-    as_tibble
+    as_tibble 
 ```
 
 ```{r}
@@ -365,7 +404,7 @@ cv_df =
   cv_df %>% 
   mutate(maineff_mod  = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
          interaction_mod  = map(train, ~lm(bwt ~ bhead * blength * babysex, data = .x)),
-         result_mod  = map(train, ~lm(bwt ~ bhead + blength + momage + smoken + momage * smoken, data = .x))) %>% 
+         result_mod  = map(train, ~lm(bwt ~ bhead + blength + mheight + delwt + gaweeks + wtgain + mrace, data = .x))) %>% 
   mutate(rmse_maineff = map2_dbl(maineff_mod, test, ~rmse(model = .x, data = .y)),
          rmse_interaction = map2_dbl(interaction_mod, test, ~rmse(model = .x, data = .y)),
          rmse_result = map2_dbl(result_mod, test, ~rmse(model = .x, data = .y)))
@@ -386,3 +425,4 @@ cv_df %>%
   geom_violin()
 ```
 
+Comparing each models with different RMSEs, we find that the main effect model has the largest RMSE, while interaction model and result model we proposed has smaller RMSEs compared to main effect one. Among them, result model we proposed perform slightly better than the interaction model according to the smaller RMSE we observed.
