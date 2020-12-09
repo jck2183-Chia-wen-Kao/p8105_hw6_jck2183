@@ -426,3 +426,105 @@ cv_df %>%
 ```
 
 Comparing each models with different RMSEs, we find that the main effect model has the largest RMSE, while interaction model and result model we proposed has smaller RMSEs compared to main effect one. Among them, result model we proposed perform slightly better than the interaction model according to the smaller RMSE we observed.
+
+## Problem 3
+
+Import Data
+
+```{r, message= FALSE}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+Write down the bootstrap function and draw repeated samples with replacement.Using the 5000 bootstrap estimates.
+```{r}
+set.seed(6)
+
+boot_sample = function(df) {
+    sample_frac(df, replace = TRUE) 
+}
+
+boot_strap =
+    tibble(
+        strap_number = 1:5000, 
+        strap_sample = rerun(5000, boot_sample(weather_df))
+    )
+
+```
+
+We’ll focus on a simple linear regression with tmax as the response and tmin as the predictor, and are interested in the distribution of two quantities estimated from these data:
+
+- Computing and plotting distribution of r-square values:
+
+```{r}
+boot_rsquared =
+    boot_strap %>% 
+    mutate(
+        models = map(strap_sample, ~lm(tmax ~ tmin, data = .x)), 
+        results = map(models, broom::glance)
+    ) %>% 
+    select(strap_number, results) %>% 
+    unnest(results) %>% 
+    select(strap_number, r.squared)
+
+
+boot_rsquared %>% 
+  ggplot(aes(x = r.squared)) + 
+  geom_density(color = "dark red") +
+  geom_vline(aes(xintercept = mean(r.squared), color = "black"), linetype = "dashed") +
+  theme(legend.position = "none")
+```
+
+The distribution of r-square values is left-skewed with a slightly heavy tail extending to low values.
+
+```{r}
+boot_rsquared %>% 
+    summarise(
+        ci_lower = quantile(r.squared, 0.025), 
+        ci_upper = quantile(r.squared, 0.975)
+    )
+```
+The 95% confidence interval of r-square values is (0.89, 0.93).
+
+- Computing and plotting distribution of log(β̂ 0∗β̂ 1)values:
+```{r}
+boot_logbeta =
+    boot_strap %>% 
+    mutate(
+        models = map(strap_sample, ~lm(tmax ~ tmin, data = .x)), 
+        results = map(models, broom::tidy)
+    ) %>% 
+    select(-strap_sample, -models) %>% 
+    unnest(results) %>% 
+    select(strap_number, term, estimate) %>% 
+    pivot_wider(
+    names_from = term,
+    values_from = estimate) %>% 
+    rename("b0" = "(Intercept)", 
+           "b1" = "tmin") %>% 
+    mutate(logbeta = log(b0 * b1))
+
+
+boot_logbeta %>% 
+  ggplot(aes(x = logbeta)) + 
+  geom_density(color = "dark red") +
+  geom_vline(aes(xintercept = mean(logbeta), color = "black"), linetype = "dashed") +
+  theme(legend.position = "none")
+```
+The distribution of log(β̂ 0∗β̂ 1) values is normally distributed. 
+```{r}
+boot_logbeta %>% 
+    summarise(
+        ci_lower = quantile(logbeta, 0.025), 
+        ci_upper = quantile(logbeta, 0.975)
+    )
+```
+The 95% confidence interval of log(β̂ 0∗β̂ 1) value is (1.97, 2.06).
