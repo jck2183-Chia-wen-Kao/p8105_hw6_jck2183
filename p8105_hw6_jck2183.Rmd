@@ -462,7 +462,7 @@ boot_strap =
 
 We’ll focus on a simple linear regression with tmax as the response and tmin as the predictor, and are interested in the distribution of two quantities estimated from these data:
 
-- Computing and plotting distribution of r-square values:
+### Computing and plotting distribution of r-square values:
 
 ```{r}
 boot_rsquared =
@@ -490,11 +490,12 @@ boot_rsquared %>%
     summarise(
         ci_lower = quantile(r.squared, 0.025), 
         ci_upper = quantile(r.squared, 0.975)
-    )
+    ) %>% 
+    knitr::kable()
 ```
 The 95% confidence interval of r-square values is (0.89, 0.93).
 
-- Computing and plotting distribution of log(β̂ 0∗β̂ 1)values:
+### Computing and plotting distribution of log(β̂ 0∗β̂ 1)values:
 ```{r}
 boot_logbeta =
     boot_strap %>% 
@@ -525,6 +526,7 @@ boot_logbeta %>%
     summarise(
         ci_lower = quantile(logbeta, 0.025), 
         ci_upper = quantile(logbeta, 0.975)
-    )
+    ) %>% 
+    knitr::kable()
 ```
 The 95% confidence interval of log(β̂ 0∗β̂ 1) value is (1.97, 2.06).
